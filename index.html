@@ -53,17 +53,17 @@
         </div>
     </div>
 
-    <script>
-        
 
-    Telegram.WebApp.ready();
-    Telegram.WebApp.MainButton.setText('get message').show().onClick(function () {
-         const data = document.getElementById('messageInput').value.trim();
-        Telegram.WebApp.sendData(data);
-        Telegram.WebApp.close();
-
-       
-        
-    </script>
+  <script>
+Telegram.WebApp.ready();
+Telegram.WebApp.MainButton
+  .setText('Send message')
+  .show()
+  .onClick(function () {
+    const data = document.getElementById('messageInput').value.trim();
+    Telegram.WebApp.sendData(data);
+    Telegram.WebApp.close();
+  });
+</script>
 </body>
 </html>
