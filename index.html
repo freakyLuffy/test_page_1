@@ -63,6 +63,7 @@
         alert("Please type something first!");
         return;
       }
+       const data = JSON.stringify({data:data});
       tg.sendData(data);   // sends data back to bot
       tg.close();          // closes WebApp
     }
