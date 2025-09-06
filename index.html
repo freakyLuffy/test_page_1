@@ -28,6 +28,7 @@
       border-radius: 8px;
       margin-bottom: 15px;
       font-size: 16px;
+      box-sizing: border-box;
     }
     button {
       background: #fff;
@@ -43,45 +44,122 @@
     button:hover {
       background: #f0f0f0;
     }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
+      text-align: center;
+      display: none;
+    }
+    .status.success {
+      background: rgba(255, 255, 255, 0.2);
+      color: #90EE90;
+    }
+    .status.error {
+      background: rgba(255, 0, 0, 0.2);
+      color: #FFB6C1;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>Send a Message</h2>
+    <div class="status" id="status"></div>
     <div class="input-group">
       <input type="text" id="messageInput" placeholder="Type your message here..." />
     </div>
-    <button id="sendBtn">Send</button>
+    <button id="sendBtn" disabled>Send</button>
   </div>
-
+  
   <script>
-    const tg = Telegram.WebApp;
-
+    // Initialize Telegram Web App correctly
+    const tg = window.Telegram.WebApp;
+    
+    // Ready the web app
+    tg.ready();
+    
+    // Get DOM elements
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const status = document.getElementById('status');
+    
+    // Show status message
+    function showStatus(message, type = 'success') {
+      status.textContent = message;
+      status.className = `status ${type}`;
+      status.style.display = 'block';
+      
+      setTimeout(() => {
+        status.style.display = 'none';
+      }, 3000);
+    }
+    
+    // Send message function
     function sendMessage() {
-      const data = document.getElementById("messageInput").value.trim();
-      if (!data) {
-        alert("Please type something first!");
+      const message = messageInput.value.trim();
+      
+      if (!message) {
+        showStatus("Please type something first!", 'error');
         return;
       }
-       const data = JSON.stringify({data:data});
-      tg.sendData(data);   // sends data back to bot
-      tg.close();          // closes WebApp
+      
+      // Prepare data to send to bot - FIXED JSON structure
+      const data = {
+        message: message,
+        timestamp: new Date().toISOString()
+      };
+      
+      try {
+        // Send data to bot
+        tg.sendData(JSON.stringify(data));
+        showStatus('Message sent successfully! 🎉');
+        
+        // Close the web app after sending
+        setTimeout(() => {
+          tg.close();
+        }, 500);
+        
+      } catch (error) {
+        console.error('Error sending data:', error);
+        showStatus('Failed to send message. Please try again.', 'error');
+      }
     }
-
-    // ✅ Telegram MainButton
-    tg.ready();
-    tg.MainButton.setText("Send message").show().onClick(sendMessage);
-
-    // ✅ Custom button
-    document.getElementById("sendBtn").addEventListener("click", sendMessage);
-
-    // ✅ Pressing Enter inside input
-    document.getElementById("messageInput").addEventListener("keypress", (e) => {
+    
+    // Enable/disable send button based on input
+    messageInput.addEventListener('input', () => {
+      const hasText = messageInput.value.trim().length > 0;
+      sendBtn.disabled = !hasText;
+      
+      // Update Telegram's main button
+      if (hasText) {
+        tg.MainButton.show();
+      } else {
+        tg.MainButton.hide();
+      }
+    });
+    
+    // Send button click event
+    sendBtn.addEventListener("click", sendMessage);
+    
+    // Send on Enter key press
+    messageInput.addEventListener("keypress", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
         sendMessage();
       }
     });
+    
+    // Set up Telegram's main button
+    tg.MainButton.setText("Send Message");
+    tg.MainButton.onClick(sendMessage);
+    tg.MainButton.hide(); // Initially hidden
+    
+    // Focus on input
+    messageInput.focus();
   </script>
 </body>
 </html>
