@@ -1,165 +1,1059 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telegram Web App</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Alexa Music • Room {{ room_id }}</title>
+  <meta name="theme-color" content="#0a0c10"/>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="icon" href="/favicon.ico" sizes="any"/>
+
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      margin: 0;
-      padding: 20px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      color: white;
+    html, body { background:#0a0c10; color:#e8efff; }
+    * { -webkit-tap-highlight-color: transparent; }
+    :root{
+      --bg:#0a0c10;
+      --card: rgba(255,255,255,.06);
+      --border: rgba(255,255,255,.12);
+      --ringSize: 260px;
+      --coverSize: 200px;
+      --accent1:#6ea8ff; --accent2:#7f53ff; --accent3:#ff6ad5;
+      --signGlow:#7f53ff;
     }
-    .container {
-      max-width: 400px;
-      margin: 0 auto;
+    body{ font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial; overflow-x: hidden; background: var(--bg); }
+
+    .fx-bg{ position: fixed; inset: -20vmax; z-index: 0; pointer-events:none; filter: blur(40px) saturate(120%); }
+    .fx-bg .blob{ position:absolute; border-radius:50%; width:60vmax; height:60vmax; opacity:.35;
+      background: radial-gradient(circle at 30% 30%, #7f53ff, transparent 55%),
+                  radial-gradient(circle at 70% 70%, #6ea8ff, transparent 50%);
+      animation: floatA 26s ease-in-out infinite alternate; }
+    .fx-bg .blob.b2{ left:55%; top:10%;
+      background: radial-gradient(circle at 40% 40%, #ff6ad5, transparent 55%),
+                  radial-gradient(circle at 60% 60%, #7f53ff, transparent 50%);
+      animation: floatB 32s ease-in-out infinite alternate; opacity:.28; }
+    .fx-bg .blob.b3{ left:-5%; bottom:-10%;
+      background: radial-gradient( circle at 50% 50%, #6ea8ff, transparent 50%),
+                  radial-gradient( circle at 70% 30%, #ff6ad5, transparent 55%);
+      animation: floatC 34s ease-in-out infinite alternate; opacity:.22; }
+    @keyframes floatA{from{transform:translate3d(-12%,-8%,0) rotate(0)}to{transform:translate3d(6%,10%,0) rotate(25deg)}}
+    @keyframes floatB{from{transform:translate3d(6%,-6%,0) rotate(0)}to{transform:translate3d(-10%,8%,0) rotate(-18deg)}}
+    @keyframes floatC{from{transform:translate3d(0,10%,0) rotate(0)}to{transform:translate3d(8%,-2%,0) rotate(20deg)}}
+    .stars{ position:fixed; inset:0; z-index:0; pointer-events:none; background:
+      radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,.25) 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 80% 20%, rgba(255,255,255,.22) 50%, transparent 51%),
+      radial-gradient(1.8px 1.8px at 60% 70%, rgba(255,255,255,.2) 50%, transparent 51%); animation: twinkle 4s ease-in-out infinite alternate; opacity:.5 }
+    @keyframes twinkle { from{ opacity:.35 } to{ opacity:.65 } }
+    .grain{ position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.06; mix-blend-mode:soft-light;
+      background-image:url("data:image/svg+xml;utf8,\
+      <svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 100 100'>\
+      <filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/>\
+      <feColorMatrix type='saturate' values='0'/>\
+      <feComponentTransfer><feFuncA type='table' tableValues='0 0 0 .18 0 0 0 0 0'/></feComponentTransfer></filter>\
+      <rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      background-size:200px 200px }
+
+    .glass{ position:relative; z-index:2; background:var(--card); border:1px solid var(--border); backdrop-filter: blur(10px); border-radius:16px; }
+    .glass.neon:before{ content:""; position:absolute; inset:-1px; border-radius:17px; z-index:-1;
+      background: conic-gradient(from 0deg, var(--accent1), var(--accent2), var(--accent3), var(--accent1));
+      filter: blur(20px); opacity:.15; animation:hue 12s linear infinite; }
+    @keyframes hue { to{ filter:hue-rotate(360deg) blur(20px) } }
+
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+      font-weight:800; border:0; border-radius:14px; padding:12px 16px; letter-spacing:.2px; color:#fff;
+      background: linear-gradient(135deg, #1f2a44, #243049);
+      box-shadow: 0 10px 25px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.06) inset;
+      position:relative; isolation:isolate; transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
     }
-    .input-group {
-      margin-bottom: 20px;
+    .btn:hover{ transform: translateY(-1px); box-shadow: 0 14px 30px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.08) inset; }
+    .btn:active{ transform: translateY(1px) }
+    .btn-queue{ background: linear-gradient(135deg, #7f53ff, #6ea8ff); }
+
+    .head{ overflow:hidden }
+
+    /* === Neon “broken lights” Alexa Music sign === */
+    .sign{
+      display:flex; align-items:center; gap:6px; letter-spacing: .08em;
+      filter: drop-shadow(0 4px 18px rgba(127,83,255,.45));
     }
-    input {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: 8px;
-      margin-bottom: 15px;
-      font-size: 16px;
-      box-sizing: border-box;
+    .sign .bolt{
+      width:18px; height:18px; border-radius:999px;
+      background: radial-gradient(circle at 35% 35%, #7f53ff, #6ea8ff);
+      box-shadow: 0 0 12px #7f53ff88, 0 0 28px #6ea8ff66;
+      animation: boltPulse 2.4s ease-in-out infinite;
     }
-    button {
-      background: #fff;
-      color: #667eea;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      width: 100%;
+    @keyframes boltPulse{ 0%,100%{ transform: scale(1); filter:brightness(1)} 50%{ transform:scale(1.12); filter:brightness(1.2)}}
+
+    .sign .word{
+      display:flex; align-items:center; gap:2px; font-weight:900; font-size:clamp(16px, 2.6vw, 22px);
+      text-transform:uppercase;
     }
-    button:hover {
-      background: #f0f0f0;
+    .sign .word span{
+      display:inline-block; padding:1px 2px; border-radius:4px;
+      background: linear-gradient(180deg, #0f1220, #131828);
+      color:#e7e8ff; position:relative; overflow:hidden;
+      text-shadow: 0 0 4px rgba(126,83,255,.6), 0 0 12px rgba(126,83,255,.35);
+      border:1px solid rgba(255,255,255,.1);
+      box-shadow: inset 0 0 14px rgba(127,83,255,.15), 0 6px 16px rgba(0,0,0,.45);
+      animation: flicker 6s linear infinite;
     }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    /* Randomized flicker delays to emulate broken tubes */
+    .sign .word span:nth-child(1){ animation-delay:.0s }
+    .sign .word span:nth-child(2){ animation-delay:.9s }
+    .sign .word span:nth-child(3){ animation-delay:1.7s }
+    .sign .word span:nth-child(4){ animation-delay:2.3s }
+    .sign .word span:nth-child(5){ animation-delay:3.1s }
+    .sign .word span:nth-child(6){ animation-delay:4.2s }
+    .sign .word span:nth-child(7){ animation-delay:5.0s }
+    @keyframes flicker{
+      0%, 2%, 4%, 5% { filter: brightness(1.05) saturate(1.05); opacity:1 }
+      1%, 3%         { filter: brightness(.5)  saturate(.9);  opacity:.45 }
+      20%            { opacity:1 }
+      40%            { opacity:.95 }
+      60%            { opacity:1 }
+      80%            { opacity:.9 }
+      100%           { opacity:1 }
     }
-    .status {
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 8px;
-      text-align: center;
-      display: none;
+    /* A subtle “electric glitch” scan */
+    .sign .word span::after{
+      content:""; position:absolute; inset:-40% -20% auto auto; width:150%; height:150%;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);
+      transform:rotate(20deg); animation: scan 3.6s linear infinite;
+      mix-blend-mode: screen; opacity:.35;
     }
-    .status.success {
-      background: rgba(255, 255, 255, 0.2);
-      color: #90EE90;
+    @keyframes scan{ 0%{ transform:translateX(-130%) rotate(20deg) } 100%{ transform:translateX(30%) rotate(20deg) }}
+
+    /* === LIVE badge with pulse and mini EQ === */
+    .liveBadge{
+      position:relative; display:inline-flex; align-items:center; gap:8px;
+      padding:4px 10px; border-radius:999px;
+      background:linear-gradient(135deg,#ff6ad5,#7f53ff,#6ea8ff);
+      color:#fff; font-weight:900; letter-spacing:.04em; text-shadow:0 1px 0 rgba(0,0,0,.25);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset, 0 10px 24px rgba(127,83,255,.35);
+      animation: livePulse 1.8s ease-in-out infinite;
+      overflow: hidden;
     }
-    .status.error {
-      background: rgba(255, 0, 0, 0.2);
-      color: #FFB6C1;
+    @keyframes livePulse{ 0%,100%{ filter:brightness(1)} 50%{ filter:brightness(1.18)}}
+    .liveBadge::before{
+      content:""; position:absolute; inset:-2px; border-radius:inherit;
+      background:conic-gradient(from 0deg,#ff6ad5,#7f53ff,#6ea8ff,#ff6ad5);
+      filter:blur(16px); opacity:.35; animation:hue 10s linear infinite;
     }
+    .eq{
+      display:inline-flex; align-items:flex-end; gap:2px; width:16px; height:10px;
+      mix-blend-mode:screen;
+    }
+    .eq b{ display:block; width:3px; background:rgba(255,255,255,.92); border-radius:2px; animation: eq 1200ms ease-in-out infinite; }
+    .eq b:nth-child(1){ height:40%; animation-delay:.0s }
+    .eq b:nth-child(2){ height:60%; animation-delay:.18s }
+    .eq b:nth-child(3){ height:50%; animation-delay:.35s }
+    @keyframes eq{ 0%,100%{ transform:scaleY(.6)} 50%{ transform:scaleY(1)} }
+
+    .stage{ min-height:var(--ringSize); display:grid; place-items:center; position:relative; text-align:center }
+    .ring-wrap{ width:var(--ringSize); height:var(--ringSize); position:relative; margin:0 auto; display:grid; place-items:center; filter: drop-shadow(0 0 22px rgba(127,83,255,.28)); }
+    .ring{ position:absolute; inset:0; border-radius:999px;
+      background: conic-gradient(from 0deg, var(--accent1), var(--accent2), var(--accent3), var(--accent1));
+      -webkit-mask: radial-gradient(circle at center, transparent 60%, #000 62%);
+              mask: radial-gradient(circle at center, transparent 60%, #000 62%);
+      animation: spin 8s linear infinite; }
+    .ring::after{ content:""; position:absolute; inset:10px; border-radius:999px;
+      background: radial-gradient(60% 60% at 50% 50%, rgba(255,255,255,.12), transparent 60%);
+      -webkit-mask: radial-gradient(circle at center, transparent 61%, #000 63%);
+              mask: radial-gradient(circle at center, transparent 61%, #000 63%); filter: blur(10px); }
+    .cover{ width:var(--coverSize); height:var(--coverSize); border-radius:999px; object-fit:cover;
+      border:2px solid rgba(255,255,255,.12); box-shadow:0 0 0 8px rgba(255,255,255,.05) inset, 0 25px 50px rgba(0,0,0,.45) }
+    @keyframes spin { to{ transform:rotate(360deg) } }
+    .halo{ position:absolute; inset:0; pointer-events:none; transform:translateZ(0) }
+
+    .fav-float{
+      position:absolute; top:-10px; right:-10px; z-index:3;
+      display:grid; place-items:center;
+      width:46px; height:46px; border-radius:999px;
+      background: rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.18); backdrop-filter: blur(6px);
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+    .fav-ico{ font-size:22px; line-height:1; transition: transform .12s ease, filter .12s ease, color .12s ease; }
+    .fav-ico.on{ color:#ff426f; filter: drop-shadow(0 0 10px rgba(255,66,111,.5)); }
+    .fav-float:active .fav-ico{ transform: scale(.9) }
+
+    .prog{ height:10px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); box-shadow: inset 0 2px 6px rgba(0,0,0,.25) }
+    .prog .fill{ width:0%; height:100%; border-radius:inherit;
+      background: linear-gradient(90deg, var(--accent1), var(--accent2), var(--accent3));
+      position: relative; transition: width .25s linear;
+      box-shadow: 0 0 12px rgba(127,83,255,.6), 0 0 20px rgba(110,168,255,.35); }
+    .prog .fill::after{ content:""; position:absolute; inset:0;
+      background: repeating-linear-gradient(135deg, rgba(255,255,255,.18) 0 8px, transparent 8px 16px);
+      mix-blend-mode: overlay; opacity:.15; pointer-events:none; animation: slide 3s linear infinite; }
+    @keyframes slide{ to { transform: translateX(100%) } }
+
+    .drawer { position: fixed; left:0; right:0; bottom:-68vh; height:68vh;
+      background: rgba(11,14,20,.96); border-top-left-radius:18px; border-top-right-radius:18px;
+      border:1px solid rgba(255,255,255,.1); box-shadow: 0 -10px 40px rgba(0,0,0,.45);
+      transition: bottom .28s ease; backdrop-filter: blur(10px); z-index:40; }
+    .drawer.open { bottom:0; }
+    .handle { width:44px; height:5px; border-radius:999px; background:rgba(255,255,255,.25); margin:10px auto 12px; }
+    .scroll-area { height: calc(68vh - 88px); overflow-y:auto; }
+    .queue-item:hover { background: rgba(255,255,255,.04) }
+
+    .tabbar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; justify-content:space-around; align-items:center; gap:6px; padding:10px 12px; background: rgba(9,11,16,.92);
+      border-top:1px solid rgba(255,255,255,.08); backdrop-filter: blur(10px) }
+    .tabbtn{ display:flex; flex-direction:column; align-items:center; gap:4px; font-size:12px; padding:8px 12px; border-radius:12px; color:#cbd5e1 }
+    .tabbtn.active{ color:#fff; background: rgba(127,83,255,.18) }
+
+    .search{ display:flex; gap:8px; align-items:center; background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); padding:10px 12px; border-radius:14px }
+    .search input{ flex:1; background:transparent; outline:none; color:#e8efff; font-weight:600; min-width:0 }
+    .search .search-btn{
+      width:42px; height:36px; display:inline-grid; place-items:center;
+      border-radius:10px; border:1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.08); font-size:16px; line-height:1;
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+    .search .search-btn:hover{ transform: translateY(-1px) }
+    .result-item:hover{ background: rgba(255,255,255,.04) }
+    .fav{ border:0; background:transparent; font-size:18px; line-height:1; transition: transform .12s ease }
+    .fav:active{ transform: scale(.9) }
+    .fav.on{ color:#ff6ad5; filter: drop-shadow(0 0 10px rgba(255,106,213,.35)) }
+
+    .room-scroll{ max-height: calc(100vh - 180px); overflow-y: auto; overscroll-behavior: contain; scroll-behavior:smooth; }
+
+    .listener-chip{ display:flex; align-items:center; gap:.5rem; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); padding:6px 8px; border-radius:999px }
+    .listener-chip img{ width:24px; height:24px; border-radius:999px; object-fit:cover }
+    .listener-chip span{ font-size:.8rem; color:#e6ecff; max-width:140px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+
+    .toast-wrap{ position: fixed; right: 14px; top: 14px; z-index: 70; display: grid; gap: 8px; width: min(92vw, 380px); }
+    .toast{
+      display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-radius:12px;
+      background: rgba(12,16,24,.96); border:1px solid rgba(255,255,255,.1); color:#e8efff;
+      box-shadow: 0 10px 30px rgba(0,0,0,.4); transform: translateY(-6px); opacity: 0;
+      animation: toastIn .18s ease forwards;
+    }
+    .toast .ico{ font-size:18px; line-height:1 }
+    .toast .txt{ font-weight:700; font-size:13px; letter-spacing:.2px }
+    .toast .sub{ font-size:12px; color:#cbd5e1 }
+    .toast.ok{ border-color: rgba(110,168,255,.35) }
+    .toast.warn{ border-color: rgba(255,166,0,.45) }
+    .toast.err{ border-color: rgba(255,90,90,.5) }
+    @keyframes toastIn{ to { transform: translateY(0); opacity: 1 } }
+    @keyframes toastOut{ to { transform: translateY(-6px); opacity: 0 } }
+
+    main{ padding-bottom:120px }
+    @media (max-width:380px){ :root{ --ringSize:220px; --coverSize:170px } }
+    @media (min-width:640px){ :root{ --ringSize:300px; --coverSize:230px } }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Send a Message</h2>
-    <div class="status" id="status"></div>
-    <div class="input-group">
-      <input type="text" id="messageInput" placeholder="Type your message here..." />
+  <div class="fx-bg"><div class="blob"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+  <div class="stars"></div>
+  <div class="grain"></div>
+
+  <!-- toast container -->
+  <div id="toasts" class="toast-wrap" aria-live="polite" aria-atomic="true"></div>
+
+  <header class="max-w-4xl mx-auto px-4 pt-5 relative z-10 head" id="pageHeader">
+    <div class="glass neon flex items-center justify-between px-4 py-3 overflow-hidden">
+      <!-- Glitchy sign -->
+      <div class="flex items-center gap-3">
+        <div class="sign">
+          <div class="bolt" aria-hidden="true"></div>
+          <div class="word" aria-label="Alexa Music" title="Alexa Music">
+            <span>A</span><span>L</span><span>Ξ</span><span>X</span><span>A</span>
+            <span style="width:6px;opacity:.45"></span>
+            <span>M</span><span>U</span><span>S</span><span>I</span><span>C</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIVE badge + listeners -->
+      <div class="relative flex items-center gap-3 text-sm text-slate-300">
+        <span class="text-sm px-3 py-1 rounded-lg bg-white/10 border border-white/20">
+        <span id="listenerCount">0 listeners</span>
+        </span>
+      </div>
     </div>
-    <button id="sendBtn" disabled>Send</button>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-6 space-y-6 relative z-10">
+    <!-- HOME -->
+    <section id="homeScreen" class="space-y-6">
+      <div class="glass neon p-4">
+        <div class="search">
+          <span aria-hidden="true">☰</span>
+          <input id="searchInput" type="text" placeholder="Search tracks & artists…" autocomplete="off"/>
+          <button id="searchBtn" class="search-btn" title="Search" aria-label="Search">🔎</button>
+        </div>
+        <div id="searchResults" class="mt-3 divide-y divide-white/10"></div>
+
+        <div id="defaultWrap" class="mt-4">
+          <div class="text-sm text-slate-300 mb-2">Suggested</div>
+          <div id="defaultResults" class="divide-y divide-white/10"></div>
+        </div>
+      </div>
+
+      <section class="glass neon p-5 text-center">
+        <div class="text-xl md:text-2xl font-extrabold truncate px-4">Welcome to Alexa Music</div>
+        <div class="text-slate-400 text-sm mt-1">Queue a track to start the Room, or tap Join when invited</div>
+      </section>
+
+      <footer class="text-center text-slate-400 text-xs pb-20">Alexa Music • Built by ❣️ for music lovers 💿</footer>
+    </section>
+
+    <!-- ROOM -->
+    <section id="roomScreen" class="hidden">
+      <div class="room-scroll space-y-6" id="roomScroll">
+        <section class="glass neon p-5">
+          <div class="stage">
+            <div class="ring-wrap" id="ringWrap">
+              <div class="ring"></div>
+              <canvas id="halo" class="halo"></canvas>
+              <img id="cover" class="cover" alt="cover"/>
+              <button id="favFloat" class="fav-float" title="Favorite">
+                <span id="favIcon" class="fav-ico">♡</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="text-center mt-6">
+            <div id="title" class="text-xl md:text-2xl font-extrabold truncate px-4">Nothing playing</div>
+            <div class="mt-2 text-sm text-slate-300">
+              <span id="elapsed" class="mono">00:00</span>
+              <span class="mx-1 text-slate-500">/</span>
+              <span id="duration" class="mono">00:00</span>
+            </div>
+            <div class="prog mt-3 mx-auto max-w-[560px]"><div id="progressFill" class="fill"></div></div>
+          </div>
+
+          <div class="mt-6">
+            <div class="text-sm text-slate-300 mb-2">Listeners</div>
+            <div id="listenerChips" class="flex flex-wrap gap-2"></div>
+          </div>
+
+          <div class="mt-6 text-center">
+            <button class="btn btn-queue" id="roomQueueBtn">🧾 Open Queue</button>
+          </div>
+
+          <audio id="player" preload="auto" playsinline></audio>
+        </section>
+      </div>
+    </section>
+
+    <!-- PROFILE -->
+    <section id="profileScreen" class="hidden space-y-6">
+      <div class="glass neon p-5 flex items-center gap-4">
+        <div class="relative w-16 h-16 rounded-full overflow-hidden border border-white/10 bg-slate-900">
+          <img id="profileAvatar" class="w-full h-full object-cover" alt="avatar"/>
+          <span style="position:absolute; inset:-40% -20% auto auto; width:130%; height:130%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent); transform:rotate(25deg); animation:shine 3s linear infinite"></span>
+        </div>
+        <div class="min-w-0">
+          <div id="profileName" class="text-lg font-extrabold truncate">User</div>
+          <div id="profileUsername" class="text-sm text-slate-400 truncate"></div>
+        </div>
+        <div class="ml-auto text-right">
+          <div class="text-xs text-slate-400">Favorites</div>
+          <div id="profileFavCount" class="text-lg font-extrabold">0</div>
+          <div class="text-xs text-slate-400">Total plays</div>
+          <div id="profileTotalPlays" class="text-lg font-extrabold">0</div>
+        </div>
+      </div>
+      <style>@keyframes shine{0%{transform:translateX(-140%) rotate(25deg)}100%{transform:translateX(40%) rotate(25deg)}}</style>
+
+      <div class="grid grid-cols-2 gap-3">
+        <button id="btnShowFav" class="btn w-full">♥ Favorites</button>
+        <button id="btnShowRecent" class="btn w-full">⟳ Recents</button>
+      </div>
+
+      <div id="favPanel" class="glass p-5 hidden">
+        <div class="flex items-center justify-between mb-3">
+          <div class="font-bold">Favorites</div>
+          <div id="favCount" class="text-sm text-slate-400">0</div>
+        </div>
+        <div id="favList" class="divide-y divide-white/10"></div>
+      </div>
+
+      <div id="recentPanel" class="glass p-5 hidden">
+        <div class="flex items-center justify-between mb-3">
+          <div class="font-bold">Recent</div>
+          <div id="recentCount" class="text-sm text-slate-400">0</div>
+        </div>
+        <div id="recentList" class="divide-y divide-white/10"></div>
+      </div>
+
+      <div class="pb-24"></div>
+    </section>
+  </main>
+
+  <!-- Drawer -->
+  <aside id="drawer" class="drawer">
+    <div class="handle"></div>
+    <div class="px-4 pb-3 flex items-center justify-between">
+      <div class="font-bold">Up Next</div>
+      <button id="closeDrawer" class="btn">Close</button>
+    </div>
+    <div id="queueList" class="scroll-area divide-y divide-white/10"></div>
+  </aside>
+
+  <!-- Join -->
+  <div id="joinOverlay" style="position:fixed; inset:0; display:grid; place-items:center; background:linear-gradient(180deg, rgba(9,11,16,.92), rgba(9,11,16,.65)); z-index:50;">
+    <div class="glass p-6 rounded-xl text-center max-w-sm mx-auto">
+      <div class="text-2xl font-extrabold mb-1">Alexa Music ⚡</div>
+      <div class="text-slate-300 text-sm mb-4">Tap to join the Room and start the live stream</div>
+      <button id="joinBtn" type="button" class="btn btn-queue w-full">🎧 Join Room</button>
+      <div class="text-[11px] text-slate-400 mt-3">We’ll auto-seek to LIVE if a track is already playing</div>
+    </div>
   </div>
-  
-  <script>
-    // Initialize Telegram Web App correctly
-    const tg = window.Telegram.WebApp;
-    
-    // Ready the web app
-    tg.ready();
-    
-    // Get DOM elements
-    const messageInput = document.getElementById('messageInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const status = document.getElementById('status');
-    
-    // Show status message
-    function showStatus(message, type = 'success') {
-      status.textContent = message;
-      status.className = `status ${type}`;
-      status.style.display = 'block';
-      
-      setTimeout(() => {
-        status.style.display = 'none';
-      }, 3000);
+
+  <!-- Tabs -->
+  <nav class="tabbar" id="bottomTabbar">
+    <button class="tabbtn active" data-tab="home"><span>🏠</span><span>Home</span></button>
+    <button class="tabbtn" data-tab="room"><span>🎛</span><span>Room</span></button>
+    <button class="tabbtn" data-tab="profile"><span>👤</span><span>You</span></button>
+  </nav>
+
+<script>
+const roomId = "{{ room_id }}";
+const socket = io({ transports: ["websocket"] });
+const tg = window.Telegram?.WebApp; tg?.expand?.();
+
+/* Elements */
+const els = {
+  player: document.getElementById("player"),
+  cover: document.getElementById("cover"),
+  title: document.getElementById("title"),
+  elapsed: document.getElementById("elapsed"),
+  duration: document.getElementById("duration"),
+  progress: document.getElementById("progressFill"),
+  listenerCount: document.getElementById("listenerCount"),
+  listenerChips: document.getElementById("listenerChips"),
+  queueList: document.getElementById("queueList"),
+  drawer: document.getElementById("drawer"),
+  closeDrawer: document.getElementById("closeDrawer"),
+  joinOverlay: document.getElementById("joinOverlay"),
+  joinBtn: document.getElementById("joinBtn"),
+  ringWrap: document.getElementById("ringWrap"),
+  halo: document.getElementById("halo"),
+  home: document.getElementById("homeScreen"),
+  room: document.getElementById("roomScreen"),
+  profile: document.getElementById("profileScreen"),
+  roomQueueBtn: document.getElementById("roomQueueBtn"),
+  favFloat: document.getElementById("favFloat"),
+  favIcon: document.getElementById("favIcon"),
+  header: document.getElementById("pageHeader"),
+  tabbar: document.getElementById("bottomTabbar"),
+  roomScroll: document.getElementById("roomScroll"),
+  searchInput: document.getElementById("searchInput"),
+  searchBtn: document.getElementById("searchBtn"),
+  searchResults: document.getElementById("searchResults"),
+  defaultResults: document.getElementById("defaultResults"),
+  favPanel: document.getElementById("favPanel"),
+  favList: document.getElementById("favList"),
+  favCount: document.getElementById("favCount"),
+  recentPanel: document.getElementById("recentPanel"),
+  recentList: document.getElementById("recentList"),
+  recentCount: document.getElementById("recentCount"),
+  profileName: document.getElementById("profileName"),
+  profileUsername: document.getElementById("profileUsername"),
+  profileAvatar: document.getElementById("profileAvatar"),
+  profileFavCount: document.getElementById("profileFavCount"),
+  profileTotalPlays: document.getElementById("profileTotalPlays"),
+  toasts: document.getElementById("toasts"),
+};
+
+/* --- Server clock offset (ms): serverNow - clientNow --- */
+let __clockOffsetMs = 0;
+
+/* YT helpers: extract ID + build thumbnail */
+function extractYouTubeId(input=""){
+  if(!input) return "";
+  if(/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
+  try{
+    const u = new URL(input);
+    if(u.hostname.includes("youtu.be")) return u.pathname.replace("/","").slice(0,11);
+    if(u.hostname.includes("youtube.com")){
+      const v = u.searchParams.get("v");
+      if(v) return v.slice(0,11);
+      const parts = u.pathname.split("/");
+      const idx = parts.findIndex(p=>["shorts","embed","v"].includes(p));
+      if(idx>=0 && parts[idx+1]) return parts[idx+1].slice(0,11);
     }
-    
-    // Send message function
-    function sendMessage() {
-      const message = messageInput.value.trim();
-      
-      if (!message) {
-        showStatus("Please type something first!", 'error');
-        return;
-      }
-      
-      // Prepare data to send to bot - FIXED JSON structure
-      const data = {
-        message: message,
-        timestamp: new Date().toISOString()
-      };
-      
-      try {
-        // Send data to bot
-        tg.sendData(JSON.stringify(data));
-        showStatus('Message sent successfully! 🎉');
-        
-        // Close the web app after sending
-        setTimeout(() => {
-          tg.close();
-        }, 500);
-        
-      } catch (error) {
-        console.error('Error sending data:', error);
-        showStatus('Failed to send message. Please try again.', 'error');
-      }
+  }catch{}
+  return input;
+}
+function ytThumb(id, quality="hqdefault"){
+  const vid = extractYouTubeId(String(id||""));
+  return vid ? `https://i.ytimg.com/vi/${vid}/${quality}.jpg` : "";
+}
+function ensureThumb(obj){ 
+  if(!obj) return obj;
+  if(!obj.thumb){ obj.thumb = ytThumb(obj.id); }
+  return obj;
+}
+
+/* Toasts (with deduper) */
+const __TOAST_KEYS = new Set();
+function toast({icon="ℹ️", title="", sub="", kind="ok", life=2800}={}){
+  const el = document.createElement("div");
+  el.className = `toast ${kind}`;
+  el.innerHTML = `<div class="ico">${icon}</div><div><div class="txt">${title}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`;
+  els.toasts.appendChild(el);
+  const timer = setTimeout(()=>{ el.style.animation = "toastOut .18s ease forwards"; setTimeout(()=>el.remove(), 160); }, life);
+  el.addEventListener("click", ()=>{ clearTimeout(timer); el.style.animation = "toastOut .18s ease forwards"; setTimeout(()=>el.remove(), 120); });
+}
+function toastOnce(key, opts){
+  if(__TOAST_KEYS.has(key)) return;
+  __TOAST_KEYS.add(key);
+  toast(opts);
+  setTimeout(()=>{ __TOAST_KEYS.delete(key); }, 60_000);
+}
+
+/* State */
+let currentVer = 0;
+let tickTimer = null;
+let audioUnlocked = false;
+let wantAutoplay = false;
+let myUid = null;
+window.__FAVIDS = new Set();
+let prevQueueIds = [];
+let prevListenerIds = new Set();
+let lastPreparingId = "";
+
+/* Debounce helper (for search input) */
+function debounce(fn, ms=350){
+  let t=null;
+  return (...args) => { clearTimeout(t); t=setTimeout(()=>fn(...args), ms); };
+}
+
+/* Layout */
+function sizeRoomScroll(){
+  if(!els.roomScroll) return;
+  const headerH = els.header?.offsetHeight || 100;
+  const tabH = els.tabbar?.offsetHeight || 64;
+  const margin = 24;
+  const max = Math.max(320, window.innerHeight - headerH - tabH - margin);
+  els.roomScroll.style.maxHeight = max + "px";
+  els.roomScroll.style.overflowY = "auto";
+  els.roomScroll.style.webkitOverflowScrolling = "touch";
+}
+window.addEventListener("resize", sizeRoomScroll);
+document.addEventListener("DOMContentLoaded", sizeRoomScroll);
+
+/* Tabs */
+function showScreen(which){
+  els.home.classList.toggle("hidden", which!=="home");
+  els.room.classList.toggle("hidden", which!=="room");
+  els.profile.classList.toggle("hidden", which!=="profile");
+  document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
+  document.querySelector(`.tabbtn[data-tab="${which}"]`)?.classList.add("active");
+  sizeRoomScroll();
+  if (which === "profile") { renderProfile(); syncFavIds(); syncRecents(); syncProfileStats(); }
+}
+document.querySelectorAll(".tabbtn").forEach(btn=>{
+  btn.addEventListener("click", ()=> showScreen(btn.dataset.tab));
+});
+
+/* Queue drawer */
+function openQueue(){ els.drawer.classList.add("open"); }
+function closeQueue(){ els.drawer.classList.remove("open"); }
+els.roomQueueBtn.addEventListener("click", openQueue);
+els.closeDrawer.addEventListener("click", closeQueue);
+
+/* Join */
+const tgUser = (window.Telegram?.WebApp?.initDataUnsafe?.user) || { id: Math.floor(Math.random()*1e9), first_name:"Guest" };
+myUid = String(tgUser.id || "");
+els.joinBtn.addEventListener("click", ()=>{
+  audioUnlocked = true;
+  wantAutoplay = true;
+  els.joinOverlay.style.display = "none";
+  showScreen("room");
+  toast({icon:"🎧", title:"Joined room", kind:"ok"});
+  // Do NOT apply local state here; rely on authoritative server state below
+  socket.emit("request_state", { roomId });
+});
+
+/* Socket join */
+socket.emit("join", { roomId, tgUser });
+
+/* Utils */
+function fmt(sec){ sec=Math.max(0,Number(sec)||0); const m=String(Math.floor(sec/60)).padStart(2,"0"); const s=String(Math.floor(sec%60)).padStart(2,"0"); return `${m}:${s}`; }
+function escapeHtml(s=''){ return s.replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+/* Listeners / Queue */
+function renderListeners(list){
+  els.listenerChips.innerHTML = "";
+  const idsNow = new Set();
+  (list||[]).forEach(u=>{
+    idsNow.add(String(u.id));
+    const chip=document.createElement("div"); chip.className="listener-chip";
+    if (u.avatar){
+      const im=document.createElement("img"); im.src=u.avatar; im.alt=u.name||"user"; chip.appendChild(im);
+    } else {
+      const im=document.createElement("div");
+      im.style.width="24px"; im.style.height="24px"; im.style.borderRadius="999px";
+      im.style.background="#0f172a"; im.style.display="grid"; im.style.placeItems="center";
+      im.style.color="#cbd5e1"; im.style.fontWeight="700";
+      im.textContent=(u.name||"U").slice(0,1).toUpperCase();
+      chip.appendChild(im);
     }
-    
-    // Enable/disable send button based on input
-    messageInput.addEventListener('input', () => {
-      const hasText = messageInput.value.trim().length > 0;
-      sendBtn.disabled = !hasText;
-      
-      // Update Telegram's main button
-      if (hasText) {
-        tg.MainButton.show();
-      } else {
-        tg.MainButton.hide();
-      }
+    const nm=document.createElement("span"); nm.textContent = u.name || u.username || 'User'; chip.appendChild(nm);
+    els.listenerChips.appendChild(chip);
+  });
+  idsNow.forEach(id=>{
+    if(!prevListenerIds.has(id)){
+      const user = (list||[]).find(x=>String(x.id)===id);
+      if(user) toast({icon:"👋", title:`${user.name || user.username || "User"} joined`, kind:"ok"});
+    }
+  });
+  prevListenerIds = idsNow;
+  const n=(list||[]).length;
+  els.listenerCount.textContent = `${n} listener${n===1?"":"s"}`;
+}
+function renderQueue(q){
+  els.queueList.innerHTML = "";
+  const ids = (q||[]).map(t=>String(t.id));
+  if(ids.length > prevQueueIds.length){
+    const newly = ids.filter(id=>!prevQueueIds.includes(id));
+    if(newly.length){
+      const lastId = newly[newly.length-1];
+      const tr = (q||[]).find(t=>String(t.id)===lastId);
+      if(tr) toastOnce(`queued:${lastId}`, {icon:"➕", title:"Added to queue", sub:escapeHtml(tr.title||tr.id), kind:"ok"});
+    }
+  }
+  prevQueueIds = ids.slice();
+  (q||[]).forEach((t,i)=>{
+    ensureThumb(t);
+    const div=document.createElement("div"); div.className="queue-item flex items-center gap-3 px-4 py-3";
+    div.innerHTML = `
+      <div class="w-12 h-12 rounded-xl overflow-hidden border border-white/10 bg-slate-900">
+        ${t.thumb?`<img src="${t.thumb}" class="w-full h-full object-cover" loading="lazy">`:""}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold truncate">${escapeHtml(t.title||t.id||"Untitled")}</div>
+        <div class="text-xs text-slate-400 truncate">${escapeHtml(t.artist||"")}</div>
+      </div>
+      <div class="text-xs text-slate-400 mono">${fmt(t.duration||0)}</div>
+      <div class="text-xs text-slate-500 pl-2">#${i+1}</div>`;
+    els.queueList.appendChild(div);
+  });
+}
+
+/* --- Ticking UI (server-synced) --- */
+function stopTick(){ if (tickTimer){ clearInterval(tickTimer); tickTimer=null; } }
+function startTick(startedAt, dur){
+  const baseStarted=Number(startedAt||0); const D=Math.max(0,Number(dur||0));
+  stopTick();
+  tickTimer=setInterval(()=>{
+    const serverNow = Date.now() + __clockOffsetMs; // use server-synced time
+    const pos=baseStarted?Math.max(0,Math.min(D,Math.floor((serverNow-baseStarted)/1000))):0;
+    els.elapsed.textContent=fmt(pos); els.duration.textContent=fmt(D);
+    els.progress.style.width = (D>0? (pos/D)*100 : 0) + "%";
+  }, 250);
+}
+
+/* Robust seeking */
+function seekTo(seconds){
+  return new Promise(resolve=>{
+    const target = Math.max(0, Number(seconds)||0);
+    const trySeek = ()=>{
+      try { els.player.currentTime = target; } catch {}
+      resolve();
+    };
+    if (els.player.readyState >= 1 && isFinite(els.player.duration||0)) return trySeek();
+    const onMeta = ()=>{ els.player.removeEventListener("loadedmetadata", onMeta); trySeek(); };
+    els.player.addEventListener("loadedmetadata", onMeta);
+  });
+}
+
+/* --- Apply NOW (late-join live seek fix) --- */
+async function applyNow(now, serverNow){
+  window.__NOW__ = now || null;
+  if (!now){
+    currentVer = 0;
+    els.player.pause();
+    els.player.removeAttribute("src");
+    stopTick();
+    els.title.textContent = "Nothing playing";
+    els.cover.src = "";
+    els.elapsed.textContent = "00:00";
+    els.duration.textContent = "00:00";
+    els.progress.style.width = "0%";
+    setFavIcon(null);
+    return;
+  }
+
+  const tr        = now.track || {};
+  ensureThumb(tr);
+  const ver       = Number(now.ver || 0);
+  const startedAt = Number(now.startedAt || 0);
+  const dur       = Number(tr.duration || 0);
+  const isPlaying = !!now.isPlaying;
+  const pausedMs  = Number(now.pausedElapsed || 0);
+
+  const refNowMs  = (typeof serverNow === "number") ? serverNow : (Date.now() + __clockOffsetMs);
+  const livePos   = startedAt ? Math.max(0, Math.min(dur, Math.floor((refNowMs - startedAt) / 1000))) : 0;
+  const posSec    = isPlaying ? livePos : Math.max(0, Math.min(dur, Math.floor(pausedMs / 1000)));
+
+  els.title.textContent = tr.title || tr.id || "Unknown";
+  els.cover.src = tr.thumb || ytThumb(tr.id);
+
+  const prep = async (pos, shouldPlay) => {
+    await seekTo(pos);
+    if (shouldPlay && (audioUnlocked || wantAutoplay)){
+      try { await els.player.play(); } catch(e){}
+      wantAutoplay = false;
+      startTick(startedAt, dur);
+    } else {
+      try { els.player.pause(); } catch {}
+      wantAutoplay = false;
+      stopTick();
+      els.elapsed.textContent = fmt(pos);
+      els.duration.textContent = fmt(dur);
+      els.progress.style.width = (dur > 0 ? (pos / dur) * 100 : 0) + "%";
+    }
+  };
+
+  if (currentVer !== ver){
+    currentVer = ver;
+    toastOnce(`now:${ver}`, {icon:"▶️", title:"Now playing", sub: escapeHtml(tr.title||tr.id||""), kind:"ok"});
+    stopTick(); els.player.pause();
+    els.player.src = (tr.url || "") + `?v=${ver}`;
+    els.player.dataset.ver = String(ver);
+    if (els.player.readyState >= 1) {
+      await prep(posSec, isPlaying);
+    } else {
+      els.player.addEventListener("loadedmetadata", async function onMeta(){
+        els.player.removeEventListener("loadedmetadata", onMeta);
+        await prep(posSec, isPlaying);
+      });
+    }
+  } else {
+    const drift = Math.abs((els.player.currentTime || 0) - posSec);
+    if (drift > 0.5){ await seekTo(posSec); }
+    await prep(posSec, isPlaying);
+  }
+
+  setFavIcon(tr.id);
+}
+
+els.player.addEventListener("ended", ()=>{
+  const ver = Number(els.player.dataset.ver||0);
+  if (ver) socket.emit("ended", { roomId, ver });
+});
+
+/* --- Socket events (also learn server offset) --- */
+socket.on("state", (state)=>{
+  if (typeof state?.serverNow === "number"){
+    __clockOffsetMs = Number(state.serverNow) - Date.now();
+  }
+  (state.queue||[]).forEach(ensureThumb);
+  if(state.now?.track) ensureThumb(state.now.track);
+  renderListeners(state.listeners||[]);
+  renderQueue(state.queue||[]);
+  applyNow(state.now||null, state.serverNow||Date.now());
+});
+socket.on("presence:list", (list)=> renderListeners(list||[]));
+socket.on("queue:update", (q)=>{
+  (q||[]).forEach(ensureThumb);
+  renderQueue(q||[]);
+});
+socket.on("now:update", (payload)=>{
+  if (typeof payload?.serverNow === "number"){
+    __clockOffsetMs = Number(payload.serverNow) - Date.now();
+  }
+  if (payload?.preparing?.id && payload?.preparing?.title){
+    const pid = String(payload.preparing.id);
+    if (pid !== lastPreparingId){
+      lastPreparingId = pid;
+      toastOnce(`prep:${pid}`, {icon:"⏳", title:"Preparing…", sub: escapeHtml(payload.preparing.title), kind:"warn"});
+    }
+  }
+  if(payload?.now?.track) ensureThumb(payload.now.track);
+  applyNow(payload?.now||null, payload?.serverNow||Date.now());
+});
+
+/* ---------- Favorites / Search / Defaults ---------- */
+function setFavIcon(id){
+  const on = id && window.__FAVIDS.has(String(id));
+  els.favIcon.textContent = on ? "❤" : "♡";
+  els.favIcon.classList.toggle("on", !!on);
+}
+
+/* Force default thumbnail when saving favorites */
+async function addFav(track){
+  ensureThumb(track);
+  track.thumb = ytThumb(track.id); // <-- ALWAYS default URL
+  try{
+    window.__FAVIDS.add(String(track.id)); updateListHeartIcons(); setFavIcon(window.__NOW__?.track?.id);
+    const r = await fetch(`/api/users/${myUid}/favorites`, { method:"POST", headers:{'Content-Type':'application/json'}, body: JSON.stringify(track) });
+    const d = await r.json(); if(d?.ok){ await syncFavIds(); return true; }
+  }catch{}
+  return false;
+}
+
+async function removeFav(id){
+  try{
+    window.__FAVIDS.delete(String(id)); updateListHeartIcons(); setFavIcon(window.__NOW__?.track?.id);
+    const r = await fetch(`/api/users/${myUid}/favorites/${id}`, { method:"DELETE" });
+    const d = await r.json(); if(d?.ok){ await syncFavIds(); return true; }
+  }catch{}
+  return false;
+}
+
+async function syncFavIds(){
+  try{
+    const r = await fetch(`/api/users/${myUid}/favorites`);
+    const d = await r.json();
+    const list = d?.favorites || d?.list || [];
+    list.forEach(ensureThumb);
+    const ids = new Set((list||[]).map(x=>String(x.id)));
+    window.__FAVIDS = ids;
+    els.favCount.textContent = String(list.length);
+    els.profileFavCount.textContent = String(list.length);
+    updateListHeartIcons();
+    setFavIcon(window.__NOW__?.track?.id || null);
+  }catch{}
+}
+function updateListHeartIcons(){
+  document.querySelectorAll("[data-fav-id]").forEach(btn=>{
+    const on = window.__FAVIDS.has(String(btn.dataset.favId));
+    btn.classList.toggle("on", on);
+    btn.textContent = on ? "❤" : "♡";
+  });
+}
+
+/* Favorites list */
+async function loadFavorites(){
+  try{
+    const r=await fetch(`/api/users/${myUid}/favorites`); const d=await r.json();
+    const list = (d?.favorites || d?.list || []).map(ensureThumb);
+    els.favList.innerHTML=""; els.favCount.textContent=String(list.length);
+    list.forEach((t)=>{
+      const row=document.createElement("div"); row.className="flex items-center gap-3 px-3 py-3";
+      row.innerHTML = `
+        <div class="w-12 h-12 rounded-xl overflow-hidden border border-white/10 bg-slate-900">
+          ${t.thumb?`<img src="${t.thumb}" class="w-full h-full object-cover" loading="lazy">`:""}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold truncate">${escapeHtml(t.title||t.id)}</div>
+          <div class="text-xs text-slate-400 truncate">${escapeHtml(t.artist||"")}</div>
+        </div>
+        <div class="text-xs text-slate-400 mono">${fmt(t.duration||0)}</div>
+        <button class="fav ${window.__FAVIDS.has(String(t.id))?'on':''}" data-fav-id="${t.id}" data-title="${escapeHtml(t.title||'')}" data-artist="${escapeHtml(t.artist||'')}" data-duration="${t.duration||0}" data-thumb="${t.thumb||''}">${window.__FAVIDS.has(String(t.id))?'❤':'♡'}</button>
+        <button class="btn btn-queue shrink-0" data-vid="${t.id}">Queue</button>`;
+      els.favList.appendChild(row);
     });
-    
-    // Send button click event
-    sendBtn.addEventListener("click", sendMessage);
-    
-    // Send on Enter key press
-    messageInput.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        sendMessage();
+  }catch{}
+}
+
+/* Defaults list */
+function renderDefaults(){
+  els.defaultResults.innerHTML = "";
+  fetch(`/api/defaults`).then(r=>r.json()).then(d=>{
+    const items = (d?.results || []).map(ensureThumb);
+    els.defaultResults.innerHTML = items.map(t=>`
+      <div class="result-item flex items-center gap-3 px-3 py-3">
+        <div class="w-12 h-12 rounded-xl overflow-hidden border border-white/10 bg-slate-900">
+          ${t.thumb?`<img src="${t.thumb}" class="w-full h-full object-cover" loading="lazy">`:""}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold truncate">${escapeHtml(t.title||t.id)}</div>
+          <div class="text-xs text-slate-400 truncate">${escapeHtml(t.artist||"")}</div>
+        </div>
+        <div class="text-xs text-slate-400 mono">${fmt(t.duration||0)}</div>
+        <button class="btn btn-queue shrink-0" data-vid="${t.id}">Queue</button>
+        <button class="fav ${window.__FAVIDS.has(String(t.id))?'on':''}" data-fav-id="${t.id}" data-title="${escapeHtml(t.title||'')}" data-artist="${escapeHtml(t.artist||'')}" data-duration="${t.duration||0}" data-thumb="${t.thumb||''}">${window.__FAVIDS.has(String(t.id))?'❤':'♡'}</button>
+      </div>`).join("");
+  }).catch(()=> {
+    els.defaultResults.innerHTML = `<div class="px-3 py-3 text-slate-400 text-sm">Couldn’t load suggestions.</div>`;
+  });
+}
+
+/* Search (button + Enter + typing debounce) */
+const runSearch = debounce((val)=>{
+  const q = (val || "").trim();
+  if(!q){ els.searchResults.innerHTML=""; return; }
+  doSearch(q);
+}, 400);
+
+async function doSearch(q){
+  if(!q?.trim()) return;
+  els.searchResults.innerHTML = `<div class="px-3 py-3 text-slate-400 text-sm">Searching…</div>`;
+  try{
+    const r=await fetch(`/api/search?q=${encodeURIComponent(q)}`); const d=await r.json();
+    const items=(d?.results||[]).map(ensureThumb);
+    if(!items.length){
+      els.searchResults.innerHTML = `<div class="px-3 py-3 text-slate-400 text-sm">No results for “${escapeHtml(q)}”.</div>`;
+      return;
+    }
+    els.searchResults.innerHTML = items.map(t=>`
+      <div class="result-item flex items-center gap-3 px-3 py-3">
+        <div class="w-12 h-12 rounded-xl overflow-hidden border border-white/10 bg-slate-900">
+          ${t.thumb?`<img src="${t.thumb}" class="w-full h-full object-cover" loading="lazy">`:""}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold truncate">${escapeHtml(t.title||t.id)}</div>
+          <div class="text-xs text-slate-400 truncate">${escapeHtml(t.artist||"")}</div>
+        </div>
+        <div class="text-xs text-slate-400 mono">${fmt(t.duration||0)}</div>
+        <button class="btn btn-queue shrink-0" data-vid="${t.id}">Queue</button>
+        <button class="fav ${window.__FAVIDS.has(String(t.id))?'on':''}" data-fav-id="${t.id}" data-title="${escapeHtml(t.title||'')}" data-artist="${t.artist?escapeHtml(t.artist):""}" data-duration="${t.duration||0}" data-thumb="${t.thumb||''}">${window.__FAVIDS.has(String(t.id))?'❤':'♡'}</button>
+      </div>`).join("");
+  }catch{
+    els.searchResults.innerHTML = "";
+    toast({icon:"⚠️", title:"Search failed", kind:"err"});
+  }
+}
+
+/* Wire search UI */
+els.searchBtn.addEventListener("click", ()=> doSearch(els.searchInput.value));
+els.searchInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter") doSearch(els.searchInput.value); });
+els.searchInput.addEventListener("input", (e)=> runSearch(e.target.value));
+
+/* Result/Favorite clicks (Home + Search + Favorites + Recents) */
+function handleListClick(e){
+  const qbtn=e.target.closest("[data-vid]"); const fbtn=e.target.closest("[data-fav-id]");
+  if(qbtn){
+    const vid=qbtn.dataset.vid;
+    fetch(`/api/rooms/${roomId}/queue`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ video_id: vid, requester:{ id: tgUser.id, name: tgUser.first_name, username: tgUser.username } })
+    }).then(r=>r.json()).then(js=>{
+      if(js?.ok){
+        if(js.track) ensureThumb(js.track);
+        const key = `${js.status}:${js.track?.id || vid}`;
+        const status = js.status === "playing" ? "Now playing" : "Added to queue";
+        toastOnce(key, {icon: js.status==="playing"?"▶️":"➕", title: status, sub: js.track?.title || "", kind:"ok"});
+      }else{
+        toast({icon:"⚠️", title:"Queue failed", sub: js?.error || "Try again", kind:"err"});
       }
+    }).catch(()=> toast({icon:"⚠️", title:"Queue failed", kind:"err"}));
+  }
+  if(fbtn){
+    const track = {
+      id:fbtn.dataset.favId,
+      title:fbtn.dataset.title,
+      artist:fbtn.dataset.artist,
+      duration:Number(fbtn.dataset.duration||0),
+      url:`${location.origin}/media/${fbtn.dataset.favId}.mp3`,
+      thumb: ytThumb(fbtn.dataset.favId) // force default even from lists
+    };
+    if(window.__FAVIDS.has(track.id)){
+      removeFav(track.id).then(ok=>{
+        if(!ok){ window.__FAVIDS.add(track.id); updateListHeartIcons(); }
+      });
+    }else{
+      addFav(track).then(ok=>{
+        if(!ok){ window.__FAVIDS.delete(track.id); updateListHeartIcons(); }
+      });
+    }
+  }
+}
+els.defaultResults.addEventListener("click", handleListClick);
+els.searchResults.addEventListener("click", handleListClick);
+els.favList.addEventListener("click", handleListClick);
+els.recentList.addEventListener("click", handleListClick); // <-- FIX: Queue button works in Recents
+
+/* Favorites & Recents panel buttons */
+document.getElementById("btnShowFav").addEventListener("click", async ()=>{
+  els.favPanel.classList.toggle("hidden");
+  els.recentPanel.classList.add("hidden");
+  await loadFavorites();
+});
+document.getElementById("btnShowRecent").addEventListener("click", async ()=>{
+  els.recentPanel.classList.toggle("hidden");
+  els.favPanel.classList.add("hidden");
+  await syncRecents();
+});
+
+/* Recents */
+async function syncRecents(){
+  try{
+    const r=await fetch(`/api/rooms/${roomId}/recent?limit=20`); const d=await r.json(); const items=(d.results||[]).map(ensureThumb);
+    els.recentList.innerHTML="";
+    els.recentCount.textContent=String(items.length);
+    items.forEach((t)=>{
+      const row=document.createElement("div"); row.className="flex items-center gap-3 px-3 py-3";
+      row.innerHTML = `
+        <div class="w-12 h-12 rounded-xl overflow-hidden border border-white/10 bg-slate-900">
+          ${t.thumb?`<img src="${t.thumb}" class="w-full h-full object-cover">`:""}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold truncate">${escapeHtml(t.title||t.id)}</div>
+          <div class="text-xs text-slate-400 truncate">${escapeHtml(t.artist||"")}</div>
+        </div>
+        <div class="text-xs text-slate-400 mono">${fmt(t.duration||0)}</div>
+        <button class="btn btn-queue shrink-0" data-vid="${t.id}">Queue</button>`;
+      els.recentList.appendChild(row);
     });
-    
-    // Set up Telegram's main button
-    tg.MainButton.setText("Send Message");
-    tg.MainButton.onClick(sendMessage);
-    tg.MainButton.hide(); // Initially hidden
-    
-    // Focus on input
-    messageInput.focus();
-  </script>
+  }catch{}
+}
+
+/* Profile basics */
+function renderProfile(){
+  els.profileAvatar.src = tgUser?.photo_url || "";
+  els.profileName.textContent = tgUser?.first_name || "User";
+  els.profileUsername.textContent = tgUser?.username ? `@${tgUser.username}` : "";
+}
+async function syncProfileStats(){
+  if(!myUid) return;
+  try{
+    const r=await fetch(`/api/users/${myUid}/profile`); const d=await r.json();
+    els.profileFavCount.textContent = String(d?.stats?.favorites ?? 0);
+    els.profileTotalPlays.textContent = String(d?.stats?.totalPlays ?? 0);
+  }catch{}
+}
+
+/* Room heart — always default thumb */
+els.favFloat.addEventListener("click", async ()=>{
+  const tr = window.__NOW__?.track;
+  if(!tr?.id){ toast({icon:"♡", title:"Nothing to favorite", kind:"warn"}); return; }
+  const mini = {
+    id: tr.id,
+    title: tr.title || tr.id,
+    artist: tr.artist || "",
+    duration: tr.duration || 0,
+    url: tr.url || `${location.origin}/media/${tr.id}.mp3`,
+    thumb: ytThumb(tr.id) // FORCE default
+  };
+  if(window.__FAVIDS.has(String(tr.id))){
+    const ok = await removeFav(tr.id);
+    if(ok){ toast({icon:"💔", title:"Removed from favorites", sub: mini.title, kind:"warn"}); }
+  }else{
+    const ok = await addFav(mini);
+    if(ok){ toast({icon:"♥", title:"Added to favorites", sub: mini.title, kind:"ok"}); }
+  }
+});
+
+/* Progress/heart sync */
+els.player.addEventListener("play", ()=> setFavIcon(window.__NOW__?.track?.id || null));
+els.player.addEventListener("pause",()=> setFavIcon(window.__NOW__?.track?.id || null));
+
+/* Boot */
+renderProfile();
+renderDefaults();
+showScreen("home");
+sizeRoomScroll();
+syncProfileStats();
+syncFavIds();
+
+/* Ask initial state as well */
+socket.emit('request_state', { roomId });
+
+/* Halo minimal animation */
+(function initHalo(){
+  const canvas=els.halo, wrap=els.ringWrap; if(!canvas||!wrap) return;
+  const rect=wrap.getBoundingClientRect();
+  const dpr=Math.max(1,window.devicePixelRatio||1); const size=Math.min(rect.width,rect.height);
+  canvas.width = canvas.height = size * dpr;
+  const ctx=canvas.getContext("2d"); ctx.scale(dpr,dpr);
+  function frame(){
+    ctx.clearRect(0,0,size,size);
+    const g=ctx.createRadialGradient(size/2,size/2,10,size/2,size/2,size/2);
+    g.addColorStop(0,"rgba(127,83,255,.18)"); g.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(size/2,size/2,size/2-6,0,Math.PI*2); ctx.fill();
+    requestAnimationFrame(frame);
+  } frame();
+})();
+</script>
 </body>
 </html>
