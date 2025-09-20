@@ -412,7 +412,8 @@
   </nav>
 
 <script>
-const roomId = "{{ room_id }}";
+const urlParams = new URLSearchParams(window.location.search);
+const roomId = urlParams.get('room_id');
 const socket = io({ transports: ["websocket"] });
 const tg = window.Telegram?.WebApp; tg?.expand?.();
 
