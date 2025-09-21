@@ -414,7 +414,8 @@
 <script>
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('room_id');
-const socket = io({ transports: ["websocket"] });
+  // This is the corrected line
+const socket = io("https://room-1zfo.onrender.com", { transports: ["websocket"] });
 const tg = window.Telegram?.WebApp; tg?.expand?.();
 
 /* Elements */
