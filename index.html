@@ -126,32 +126,6 @@
     }
     @keyframes scan{ 0%{ transform:translateX(-130%) rotate(20deg) } 100%{ transform:translateX(30%) rotate(20deg) }}
 
-    /* === LIVE badge with pulse and mini EQ === */
-    .liveBadge{
-      position:relative; display:inline-flex; align-items:center; gap:8px;
-      padding:4px 10px; border-radius:999px;
-      background:linear-gradient(135deg,#ff6ad5,#7f53ff,#6ea8ff);
-      color:#fff; font-weight:900; letter-spacing:.04em; text-shadow:0 1px 0 rgba(0,0,0,.25);
-      box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset, 0 10px 24px rgba(127,83,255,.35);
-      animation: livePulse 1.8s ease-in-out infinite;
-      overflow: hidden;
-    }
-    @keyframes livePulse{ 0%,100%{ filter:brightness(1)} 50%{ filter:brightness(1.18)}}
-    .liveBadge::before{
-      content:""; position:absolute; inset:-2px; border-radius:inherit;
-      background:conic-gradient(from 0deg,#ff6ad5,#7f53ff,#6ea8ff,#ff6ad5);
-      filter:blur(16px); opacity:.35; animation:hue 10s linear infinite;
-    }
-    .eq{
-      display:inline-flex; align-items:flex-end; gap:2px; width:16px; height:10px;
-      mix-blend-mode:screen;
-    }
-    .eq b{ display:block; width:3px; background:rgba(255,255,255,.92); border-radius:2px; animation: eq 1200ms ease-in-out infinite; }
-    .eq b:nth-child(1){ height:40%; animation-delay:.0s }
-    .eq b:nth-child(2){ height:60%; animation-delay:.18s }
-    .eq b:nth-child(3){ height:50%; animation-delay:.35s }
-    @keyframes eq{ 0%,100%{ transform:scaleY(.6)} 50%{ transform:scaleY(1)} }
-
     .stage{ min-height:var(--ringSize); display:grid; place-items:center; position:relative; text-align:center }
     .ring-wrap{ width:var(--ringSize); height:var(--ringSize); position:relative; margin:0 auto; display:grid; place-items:center; filter: drop-shadow(0 0 22px rgba(127,83,255,.28)); }
     .ring{ position:absolute; inset:0; border-radius:999px;
@@ -249,12 +223,10 @@
   <div class="stars"></div>
   <div class="grain"></div>
 
-  <!-- toast container -->
   <div id="toasts" class="toast-wrap" aria-live="polite" aria-atomic="true"></div>
 
   <header class="max-w-4xl mx-auto px-4 pt-5 relative z-10 head" id="pageHeader">
     <div class="glass neon flex items-center justify-between px-4 py-3 overflow-hidden">
-      <!-- Glitchy sign -->
       <div class="flex items-center gap-3">
         <div class="sign">
           <div class="bolt" aria-hidden="true"></div>
@@ -266,7 +238,6 @@
         </div>
       </div>
 
-      <!-- LIVE badge + listeners -->
       <div class="relative flex items-center gap-3 text-sm text-slate-300">
         <span class="text-sm px-3 py-1 rounded-lg bg-white/10 border border-white/20">
         <span id="listenerCount">0 listeners</span>
@@ -276,7 +247,6 @@
   </header>
 
   <main class="max-w-4xl mx-auto px-4 py-6 space-y-6 relative z-10">
-    <!-- HOME -->
     <section id="homeScreen" class="space-y-6">
       <div class="glass neon p-4">
         <div class="search">
@@ -300,7 +270,6 @@
       <footer class="text-center text-slate-400 text-xs pb-20">Alexa Music • Built by ❣️ for music lovers 💿</footer>
     </section>
 
-    <!-- ROOM -->
     <section id="roomScreen" class="hidden">
       <div class="room-scroll space-y-6" id="roomScroll">
         <section class="glass neon p-5">
@@ -339,7 +308,6 @@
       </div>
     </section>
 
-    <!-- PROFILE -->
     <section id="profileScreen" class="hidden space-y-6">
       <div class="glass neon p-5 flex items-center gap-4">
         <div class="relative w-16 h-16 rounded-full overflow-hidden border border-white/10 bg-slate-900">
@@ -384,7 +352,6 @@
     </section>
   </main>
 
-  <!-- Drawer -->
   <aside id="drawer" class="drawer">
     <div class="handle"></div>
     <div class="px-4 pb-3 flex items-center justify-between">
@@ -394,7 +361,6 @@
     <div id="queueList" class="scroll-area divide-y divide-white/10"></div>
   </aside>
 
-  <!-- Join -->
   <div id="joinOverlay" style="position:fixed; inset:0; display:grid; place-items:center; background:linear-gradient(180deg, rgba(9,11,16,.92), rgba(9,11,16,.65)); z-index:50;">
     <div class="glass p-6 rounded-xl text-center max-w-sm mx-auto">
       <div class="text-2xl font-extrabold mb-1">Alexa Music ⚡</div>
@@ -404,7 +370,6 @@
     </div>
   </div>
 
-  <!-- Tabs -->
   <nav class="tabbar" id="bottomTabbar">
     <button class="tabbtn active" data-tab="home"><span>🏠</span><span>Home</span></button>
     <button class="tabbtn" data-tab="room"><span>🎛</span><span>Room</span></button>
@@ -412,11 +377,15 @@
   </nav>
 
 <script>
+// --- CONFIGURATION ---
+const BACKEND_URL = "https://room-1zfo.onrender.com";
+
+// --- INITIALIZATION ---
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('room_id');
-  // This is the corrected line
-const socket = io("https://room-1zfo.onrender.com", { transports: ["websocket"] });
-const tg = window.Telegram?.WebApp; tg?.expand?.();
+const socket = io(BACKEND_URL, { transports: ["websocket"] });
+const tg = window.Telegram?.WebApp;
+tg?.expand?.();
 
 /* Elements */
 const els = {
@@ -486,7 +455,7 @@ function ytThumb(id, quality="hqdefault"){
   const vid = extractYouTubeId(String(id||""));
   return vid ? `https://i.ytimg.com/vi/${vid}/${quality}.jpg` : "";
 }
-function ensureThumb(obj){ 
+function ensureThumb(obj){
   if(!obj) return obj;
   if(!obj.thumb){ obj.thumb = ytThumb(obj.id); }
   return obj;
@@ -786,7 +755,7 @@ async function addFav(track){
   track.thumb = ytThumb(track.id); // <-- ALWAYS default URL
   try{
     window.__FAVIDS.add(String(track.id)); updateListHeartIcons(); setFavIcon(window.__NOW__?.track?.id);
-    const r = await fetch(`/api/users/${myUid}/favorites`, { method:"POST", headers:{'Content-Type':'application/json'}, body: JSON.stringify(track) });
+    const r = await fetch(`${BACKEND_URL}/api/users/${myUid}/favorites`, { method:"POST", headers:{'Content-Type':'application/json'}, body: JSON.stringify(track) });
     const d = await r.json(); if(d?.ok){ await syncFavIds(); return true; }
   }catch{}
   return false;
@@ -795,7 +764,7 @@ async function addFav(track){
 async function removeFav(id){
   try{
     window.__FAVIDS.delete(String(id)); updateListHeartIcons(); setFavIcon(window.__NOW__?.track?.id);
-    const r = await fetch(`/api/users/${myUid}/favorites/${id}`, { method:"DELETE" });
+    const r = await fetch(`${BACKEND_URL}/api/users/${myUid}/favorites/${id}`, { method:"DELETE" });
     const d = await r.json(); if(d?.ok){ await syncFavIds(); return true; }
   }catch{}
   return false;
@@ -803,7 +772,7 @@ async function removeFav(id){
 
 async function syncFavIds(){
   try{
-    const r = await fetch(`/api/users/${myUid}/favorites`);
+    const r = await fetch(`${BACKEND_URL}/api/users/${myUid}/favorites`);
     const d = await r.json();
     const list = d?.favorites || d?.list || [];
     list.forEach(ensureThumb);
@@ -826,7 +795,7 @@ function updateListHeartIcons(){
 /* Favorites list */
 async function loadFavorites(){
   try{
-    const r=await fetch(`/api/users/${myUid}/favorites`); const d=await r.json();
+    const r=await fetch(`${BACKEND_URL}/api/users/${myUid}/favorites`); const d=await r.json();
     const list = (d?.favorites || d?.list || []).map(ensureThumb);
     els.favList.innerHTML=""; els.favCount.textContent=String(list.length);
     list.forEach((t)=>{
@@ -850,7 +819,7 @@ async function loadFavorites(){
 /* Defaults list */
 function renderDefaults(){
   els.defaultResults.innerHTML = "";
-  fetch(`/api/defaults`).then(r=>r.json()).then(d=>{
+  fetch(`${BACKEND_URL}/api/defaults`).then(r=>r.json()).then(d=>{
     const items = (d?.results || []).map(ensureThumb);
     els.defaultResults.innerHTML = items.map(t=>`
       <div class="result-item flex items-center gap-3 px-3 py-3">
@@ -881,7 +850,7 @@ async function doSearch(q){
   if(!q?.trim()) return;
   els.searchResults.innerHTML = `<div class="px-3 py-3 text-slate-400 text-sm">Searching…</div>`;
   try{
-    const r=await fetch(`/api/search?q=${encodeURIComponent(q)}`); const d=await r.json();
+    const r=await fetch(`${BACKEND_URL}/api/search?q=${encodeURIComponent(q)}`); const d=await r.json();
     const items=(d?.results||[]).map(ensureThumb);
     if(!items.length){
       els.searchResults.innerHTML = `<div class="px-3 py-3 text-slate-400 text-sm">No results for “${escapeHtml(q)}”.</div>`;
@@ -916,7 +885,7 @@ function handleListClick(e){
   const qbtn=e.target.closest("[data-vid]"); const fbtn=e.target.closest("[data-fav-id]");
   if(qbtn){
     const vid=qbtn.dataset.vid;
-    fetch(`/api/rooms/${roomId}/queue`, {
+    fetch(`${BACKEND_URL}/api/rooms/${roomId}/queue`, {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ video_id: vid, requester:{ id: tgUser.id, name: tgUser.first_name, username: tgUser.username } })
     }).then(r=>r.json()).then(js=>{
@@ -953,7 +922,7 @@ function handleListClick(e){
 els.defaultResults.addEventListener("click", handleListClick);
 els.searchResults.addEventListener("click", handleListClick);
 els.favList.addEventListener("click", handleListClick);
-els.recentList.addEventListener("click", handleListClick); // <-- FIX: Queue button works in Recents
+els.recentList.addEventListener("click", handleListClick);
 
 /* Favorites & Recents panel buttons */
 document.getElementById("btnShowFav").addEventListener("click", async ()=>{
@@ -970,7 +939,7 @@ document.getElementById("btnShowRecent").addEventListener("click", async ()=>{
 /* Recents */
 async function syncRecents(){
   try{
-    const r=await fetch(`/api/rooms/${roomId}/recent?limit=20`); const d=await r.json(); const items=(d.results||[]).map(ensureThumb);
+    const r=await fetch(`${BACKEND_URL}/api/rooms/${roomId}/recent?limit=20`); const d=await r.json(); const items=(d.results||[]).map(ensureThumb);
     els.recentList.innerHTML="";
     els.recentCount.textContent=String(items.length);
     items.forEach((t)=>{
@@ -999,7 +968,7 @@ function renderProfile(){
 async function syncProfileStats(){
   if(!myUid) return;
   try{
-    const r=await fetch(`/api/users/${myUid}/profile`); const d=await r.json();
+    const r=await fetch(`${BACKEND_URL}/api/users/${myUid}/profile`); const d=await r.json();
     els.profileFavCount.textContent = String(d?.stats?.favorites ?? 0);
     els.profileTotalPlays.textContent = String(d?.stats?.totalPlays ?? 0);
   }catch{}
