@@ -381,8 +381,7 @@
 const BACKEND_URL = "https://room-1zfo.onrender.com";
 
 // --- INITIALIZATION ---
-const urlParams = new URLSearchParams(window.location.search);
-const roomId = urlParams.get('room_id');
+const roomId = "{{ room_id }}";
 const socket = io(BACKEND_URL, { transports: ["websocket"] });
 const tg = window.Telegram?.WebApp;
 tg?.expand?.();
